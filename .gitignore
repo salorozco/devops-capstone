@@ -1,0 +1,36 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite / React build output
+dist/
+dist-ssr/
+*.local
+
+# Env files (don’t commit secrets)
+.env
+.env.*
+!.env.example
+
+# OS/editor junk
+.DS_Store
+.idea/
+.vscode/
+*.swp
+# Node
+**/node_modules/
+**/.npm/
+**/.cache/
+
+# Vite / React builds
+frontend/dist/
+**/.vite/
+
+# Logs
+**/*.log
+
+# OS/editor
+.DS_Store
