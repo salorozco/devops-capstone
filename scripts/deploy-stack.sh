@@ -45,6 +45,11 @@ CODEBUILD_ROLE_ARN="$(aws cloudformation describe-stacks --stack-name "$IAM_STAC
 CLOUDFORMATION_EXEC_ROLE_ARN="$(aws cloudformation describe-stacks --stack-name "$IAM_STACK" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='CloudFormationExecutionRoleArn'].OutputValue" --output text)"
 ECS_TASK_EXEC_ROLE_ARN="$(aws cloudformation describe-stacks --stack-name "$IAM_STACK" --region "$REGION" --query "Stacks[0].Outputs[?OutputKey=='EcsTaskExecutionRoleArn'].OutputValue" --output text)"
 
+[[ -n "$CODEBUILD_ROLE_ARN" ]] || { echo "ERROR: CodeBuildRoleArn output not found (CODEBUILD_ROLE_ARN empty)"; exit 1; }
+
+
+
+
 echo "CodePipelineRoleArn: $CODEPIPELINE_ROLE_ARN"
 echo "CodeBuildRoleArn: $CODEBUILD_ROLE_ARN"
 echo "CloudFormationExecutionRoleArn: $CLOUDFORMATION_EXEC_ROLE_ARN"
