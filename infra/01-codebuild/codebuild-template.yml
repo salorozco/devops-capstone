@@ -1,70 +1,53 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Capstone - ECR repos + CodeBuild project (pipeline-invoked)"
+Description: "Capstone - ECR repos + CodeBuild project (pipeline-invoked). IAM roles come from infra/99-iam."
+
+Parameters:
+  FrontendRepoName:
+    Type: String
+    Default: devops-capstone-frontend
+
+  BackendRepoName:
+    Type: String
+    Default: devops-capstone-backend
+
+  CodeBuildProjectName:
+    Type: String
+    Default: devops-capstone-build
+
+  CodeBuildServiceRoleArn:
+    Type: String
+    Description: "IAM role ARN used by CodeBuild (created by infra/99-iam)"
+
+  BuildSpecPath:
+    Type: String
+    Default: buildspec.yml
+    Description: "Path to buildspec in the repo"
 
 Resources:
   FrontendRepo:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: devops-capstone-frontend
+      RepositoryName: !Ref FrontendRepoName
       ImageScanningConfiguration:
         ScanOnPush: true
 
   BackendRepo:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: devops-capstone-backend
+      RepositoryName: !Ref BackendRepoName
       ImageScanningConfiguration:
         ScanOnPush: true
-
-  CodeBuildRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: devops-capstone-build-role
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal: { Service: codebuild.amazonaws.com }
-            Action: "sts:AssumeRole"
-      Policies:
-        - PolicyName: devops-capstone-build-policy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
-
-              - Effect: Allow
-                Action: ecr:GetAuthorizationToken
-                Resource: "*"
-
-              - Effect: Allow
-                Action:
-                  - ecr:BatchCheckLayerAvailability
-                  - ecr:BatchGetImage
-                  - ecr:CompleteLayerUpload
-                  - ecr:GetDownloadUrlForLayer
-                  - ecr:InitiateLayerUpload
-                  - ecr:PutImage
-                  - ecr:UploadLayerPart
-                Resource:
-                  - !GetAtt FrontendRepo.Arn
-                  - !GetAtt BackendRepo.Arn
 
   CapstoneCodeBuild:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: devops-capstone-build
-      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Name: !Ref CodeBuildProjectName
+      ServiceRole: !Ref CodeBuildServiceRoleArn
       Artifacts:
         Type: CODEPIPELINE
       Source:
         Type: CODEPIPELINE
-        BuildSpec: buildspec.yml
+        BuildSpec: !Ref BuildSpecPath
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
@@ -77,8 +60,13 @@ Resources:
 Outputs:
   FrontendRepoUri:
     Value: !GetAtt FrontendRepo.RepositoryUri
-    Export: { Name: devops-capstone-frontend-repo-uri }
+    Export:
+      Name: devops-capstone-frontend-repo-uri
 
   BackendRepoUri:
     Value: !GetAtt BackendRepo.RepositoryUri
-    Export: { Name: devops-capstone-backend-repo-uri }
+    Export:
+      Name: devops-capstone-backend-repo-uri
+
+  CodeBuildProjectNameOut:
+    Value: !Ref CapstoneCodeBuild

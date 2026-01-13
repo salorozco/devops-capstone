@@ -1,0 +1,285 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "DevOps Capstone - IAM Roles for CodePipeline, CodeBuild, CloudFormation, and ECS (Fargate)"
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: devops-capstone
+    Description: "Prefix used to name IAM roles"
+
+Resources:
+  #############################################
+  # CodePipeline Role
+  #############################################
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codepipeline-service-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelineCorePermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # S3 artifact store (bucket/object access)
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:GetBucketVersioning
+                  - s3:PutBucketVersioning
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: "*"
+
+              # Use CodeStar Connections (GitHub connection)
+              - Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                Resource: "*"
+
+              # Trigger CodeBuild
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: "*"
+
+              # Deploy/execute CloudFormation actions in pipeline
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:ValidateTemplate
+                Resource: "*"
+
+              # Allow passing roles to CodeBuild/CloudFormation/ECS when required
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: "*"
+
+              # ECS Deploy action needs to register/update task defs and services indirectly
+              # (The ECS action uses the pipeline role; this keeps it simple for the lab)
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:DescribeTaskDefinition
+                  - ecs:RegisterTaskDefinition
+                  - ecs:UpdateService
+                Resource: "*"
+
+  #############################################
+  # CodeBuild Role
+  #############################################
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-codebuild-service-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildLogsAndArtifacts
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # CloudWatch logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+              # S3 artifacts (if you use them; CodePipeline also uses S3)
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource: "*"
+
+        - PolicyName: CodeBuildEcrPushPull
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Auth token is account/region-level
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: "*"
+
+              # Push/pull image layers + describe repos
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeImages
+                  - ecr:DescribeRepositories
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:ListImages
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: "*"
+
+  #############################################
+  # CloudFormation Execution Role
+  # This role is assumed by CloudFormation when your pipeline "Deploy (CloudFormation)" actions run.
+  # IMPORTANT: This is the one that needs ecr:CreateRepository, ecs, iam, etc.
+  #############################################
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-cloudformation-execution-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudFormationProvisionCapstone
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # ECR (your error was CreateRepository)
+              - Effect: Allow
+                Action:
+                  - ecr:CreateRepository
+                  - ecr:DeleteRepository
+                  - ecr:DescribeRepositories
+                  - ecr:TagResource
+                  - ecr:UntagResource
+                  - ecr:SetRepositoryPolicy
+                  - ecr:GetRepositoryPolicy
+                  - ecr:PutLifecyclePolicy
+                  - ecr:DeleteLifecyclePolicy
+                Resource: "*"
+
+              # ECS + Fargate basics
+              - Effect: Allow
+                Action:
+                  - ecs:CreateCluster
+                  - ecs:DeleteCluster
+                  - ecs:DescribeClusters
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DeregisterTaskDefinition
+                  - ecs:DescribeTaskDefinition
+                  - ecs:CreateService
+                  - ecs:UpdateService
+                  - ecs:DeleteService
+                  - ecs:DescribeServices
+                  - ecs:ListServices
+                  - ecs:TagResource
+                  - ecs:UntagResource
+                Resource: "*"
+
+              # IAM role creation if your infra templates create roles (task execution role etc.)
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                Resource: "*"
+
+              # CloudWatch Logs resources (task logs, codebuild logs groups, etc.)
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: "*"
+
+              # Networking describes (Fargate/service creation often needs subnet/sg lookups)
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeNetworkInterfaces
+                Resource: "*"
+
+              # If you add an ALB later, you'll need ELB actions
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:CreateLoadBalancer
+                  - elasticloadbalancing:DeleteLoadBalancer
+                  - elasticloadbalancing:CreateTargetGroup
+                  - elasticloadbalancing:DeleteTargetGroup
+                  - elasticloadbalancing:CreateListener
+                  - elasticloadbalancing:DeleteListener
+                  - elasticloadbalancing:Describe*
+                  - elasticloadbalancing:Modify*
+                  - elasticloadbalancing:RegisterTargets
+                  - elasticloadbalancing:DeregisterTargets
+                Resource: "*"
+
+  #############################################
+  # ECS Task Execution Role (Fargate)
+  # Used by ECS agent to pull images from ECR and send logs to CloudWatch.
+  #############################################
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-ecs-task-execution-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # This AWS-managed policy is the standard for ECS task execution:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+Outputs:
+  CodePipelineRoleArn:
+    Description: "Use this for CodePipelineRoleArn parameter"
+    Value: !GetAtt CodePipelineServiceRole.Arn
+
+  CodeBuildRoleArn:
+    Description: "Use this as the ServiceRole for CodeBuild projects"
+    Value: !GetAtt CodeBuildServiceRole.Arn
+
+  CloudFormationExecutionRoleArn:
+    Description: "Use this for CloudFormationExecutionRoleArn parameter"
+    Value: !GetAtt CloudFormationExecutionRole.Arn
+
+  EcsTaskExecutionRoleArn:
+    Description: "Use this in ECS task definition executionRoleArn"
+    Value: !GetAtt EcsTaskExecutionRole.Arn
