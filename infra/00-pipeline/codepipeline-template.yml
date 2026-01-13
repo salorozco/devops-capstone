@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "DevOps Capstone - Pipeline (monorepo) builds 2 images and deploys to 2 ECS services"
+
+Parameters:
+  CodePipelineRoleArn:
+    Type: String
+  PipelineBucket:
+    Type: String
+  GitConnectionArn:
+    Type: String
+  GitFullRepoId:
+    Type: String
+  GitBranch:
+    Type: String
+    Default: "main"
+  CloudFormationExecutionRoleArn:
+    Type: String
+
+  # ECS naming
+  EcsClusterName:
+    Type: String
+    Default: devops-capstone-cluster
+
+  FrontendServiceName:
+    Type: String
+    Default: frontend-service
+
+  BackendServiceName:
+    Type: String
+    Default: backend-service
+
+  # Passed into ECS template
+  SubnetIds:
+    Type: String
+    Description: "Comma-delimited subnet IDs for Fargate (subnet-a,subnet-b)"
+  SecurityGroupIds:
+    Type: String
+    Description: "Comma-delimited security group IDs (sg-xxx)"
+
+Resources:
+  CapstonePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: devops-capstone
+      RoleArn: !Ref CodePipelineRoleArn
+      PipelineType: V2
+      ExecutionMode: QUEUED
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineBucket
+
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: 1
+              Configuration:
+                BranchName: !Ref GitBranch
+                ConnectionArn: !Ref GitConnectionArn
+                FullRepositoryId: !Ref GitFullRepoId
+                DetectChanges: "true"
+                OutputArtifactFormat: CODE_ZIP
+              OutputArtifacts:
+                - Name: SourceArtifact
+              RunOrder: 1
+
+        - Name: DeployInfra
+          Actions:
+            - Name: DeployCodeBuildStack
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: devops-capstone-codebuild-stack
+                TemplatePath: SourceArtifact::infra/01-codebuild/codebuild-template.yml
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Ref CloudFormationExecutionRoleArn
+              InputArtifacts:
+                - Name: SourceArtifact
+              RunOrder: 1
+
+            - Name: DeployEcsStack
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: devops-capstone-ecs-stack
+                TemplatePath: SourceArtifact::infra/02-ecs/ecs-template.yml
+                Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !Ref CloudFormationExecutionRoleArn
+                ParameterOverrides: !Sub |
+                  {
+                    "EcsClusterName": "${EcsClusterName}",
+                    "FrontendServiceName": "${FrontendServiceName}",
+                    "BackendServiceName": "${BackendServiceName}",
+                    "SubnetIds": "${SubnetIds}",
+                    "SecurityGroupIds": "${SecurityGroupIds}"
+                  }
+              InputArtifacts:
+                - Name: SourceArtifact
+              RunOrder: 2
+
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: devops-capstone-build
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              RunOrder: 1
+
+        - Name: Deploy
+          Actions:
+            - Name: DeployBackend
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: 1
+              Configuration:
+                ClusterName: !Ref EcsClusterName
+                ServiceName: !Ref BackendServiceName
+                FileName: imagedefinitions-backend.json
+              InputArtifacts:
+                - Name: BuildArtifact
+              RunOrder: 1
+
+            - Name: DeployFrontend
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: 1
+              Configuration:
+                ClusterName: !Ref EcsClusterName
+                ServiceName: !Ref FrontendServiceName
+                FileName: imagedefinitions-frontend.json
+              InputArtifacts:
+                - Name: BuildArtifact
+              RunOrder: 2
+
+Outputs:
+  PipelineName:
+    Value: !Ref CapstonePipeline

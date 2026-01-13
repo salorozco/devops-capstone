@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Capstone - ECS Fargate: 2 services (frontend + backend), 2 task defs"
+
+Parameters:
+  EcsClusterName:
+    Type: String
+    Default: devops-capstone-cluster
+
+  FrontendServiceName:
+    Type: String
+    Default: frontend-service
+
+  BackendServiceName:
+    Type: String
+    Default: backend-service
+
+  SubnetIds:
+    Type: String
+    Description: "Comma-delimited subnet IDs (subnet-a,subnet-b)"
+
+  SecurityGroupIds:
+    Type: String
+    Description: "Comma-delimited SG IDs (sg-xxx)"
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref EcsClusterName
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: devops-capstone-ecs-task-exec-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  BackendTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: devops-capstone-backend-task
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Sub
+            - "${Repo}:latest"
+            - { Repo: !ImportValue devops-capstone-backend-repo-uri }
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3000
+
+  FrontendTaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: devops-capstone-frontend-task
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: frontend
+          Image: !Sub
+            - "${Repo}:latest"
+            - { Repo: !ImportValue devops-capstone-frontend-repo-uri }
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+
+  BackendService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Ref BackendServiceName
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      TaskDefinition: !Ref BackendTaskDef
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Split [",", !Ref SubnetIds]
+          SecurityGroups: !Split [",", !Ref SecurityGroupIds]
+
+  FrontendService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Ref FrontendServiceName
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      TaskDefinition: !Ref FrontendTaskDef
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Split [",", !Ref SubnetIds]
+          SecurityGroups: !Split [",", !Ref SecurityGroupIds]
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+  BackendServiceNameOut:
+    Value: !Ref BackendService
+  FrontendServiceNameOut:
+    Value: !Ref FrontendService

@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Capstone - ECR repos + CodeBuild project (pipeline-invoked)"
+
+Resources:
+  FrontendRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: devops-capstone-frontend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+
+  BackendRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: devops-capstone-backend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: devops-capstone-build-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: codebuild.amazonaws.com }
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: devops-capstone-build-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource:
+                  - !GetAtt FrontendRepo.Arn
+                  - !GetAtt BackendRepo.Arn
+
+  CapstoneCodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: devops-capstone-build
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+
+Outputs:
+  FrontendRepoUri:
+    Value: !GetAtt FrontendRepo.RepositoryUri
+    Export: { Name: devops-capstone-frontend-repo-uri }
+
+  BackendRepoUri:
+    Value: !GetAtt BackendRepo.RepositoryUri
+    Export: { Name: devops-capstone-backend-repo-uri }

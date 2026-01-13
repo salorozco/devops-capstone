@@ -10,35 +10,45 @@ phases:
   pre_build:
     commands:
       - echo "Logging in to Amazon ECR..."
-      - AWS_ACCOUNT_ID=$(echo $CODEBUILD_BUILD_ARN | cut -f 5 -d ':')
+      - AWS_ACCOUNT_ID=$(echo "$CODEBUILD_BUILD_ARN" | cut -f 5 -d ':')
       - ECR_REGISTRY_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY_URI
-      - IMAGE_TAG=$CODEBUILD_BUILD_NUMBER
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY_URI"
+      - IMAGE_TAG="$CODEBUILD_BUILD_NUMBER"
       - echo "IMAGE_TAG=$IMAGE_TAG"
+      - echo "ECR_REGISTRY_URI=$ECR_REGISTRY_URI"
+
   build:
     commands:
       - echo "Build & push frontend..."
-      - docker build -t $FRONTEND_REPO:$IMAGE_TAG ./frontend
-      - docker tag  $FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY_URI/$FRONTEND_REPO:$IMAGE_TAG
-      - docker tag  $FRONTEND_REPO:$IMAGE_TAG $ECR_REGISTRY_URI/$FRONTEND_REPO:latest
-      - docker push $ECR_REGISTRY_URI/$FRONTEND_REPO:$IMAGE_TAG
-      - docker push $ECR_REGISTRY_URI/$FRONTEND_REPO:latest
+      - docker build -t "$FRONTEND_REPO:$IMAGE_TAG" ./frontend
+      - docker tag "$FRONTEND_REPO:$IMAGE_TAG" "$ECR_REGISTRY_URI/$FRONTEND_REPO:$IMAGE_TAG"
+      - docker tag "$FRONTEND_REPO:$IMAGE_TAG" "$ECR_REGISTRY_URI/$FRONTEND_REPO:latest"
+      - docker push "$ECR_REGISTRY_URI/$FRONTEND_REPO:$IMAGE_TAG"
+      - docker push "$ECR_REGISTRY_URI/$FRONTEND_REPO:latest"
 
       - echo "Build & push backend..."
-      - docker build -t $BACKEND_REPO:$IMAGE_TAG ./backend
-      - docker tag  $BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY_URI/$BACKEND_REPO:$IMAGE_TAG
-      - docker tag  $BACKEND_REPO:$IMAGE_TAG $ECR_REGISTRY_URI/$BACKEND_REPO:latest
-      - docker push $ECR_REGISTRY_URI/$BACKEND_REPO:$IMAGE_TAG
-      - docker push $ECR_REGISTRY_URI/$BACKEND_REPO:latest
+      - docker build -t "$BACKEND_REPO:$IMAGE_TAG" ./backend
+      - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$ECR_REGISTRY_URI/$BACKEND_REPO:$IMAGE_TAG"
+      - docker tag "$BACKEND_REPO:$IMAGE_TAG" "$ECR_REGISTRY_URI/$BACKEND_REPO:latest"
+      - docker push "$ECR_REGISTRY_URI/$BACKEND_REPO:$IMAGE_TAG"
+      - docker push "$ECR_REGISTRY_URI/$BACKEND_REPO:latest"
 
   post_build:
     commands:
-      - echo "Generating imagedefinitions.json artifact for ECS deploy..."
-      - rm -f imagedefinitions.json
-      - printf '[{"name":"frontend","imageUri":"%s"},{"name":"backend","imageUri":"%s"}]' "$ECR_REGISTRY_URI/$FRONTEND_REPO:$CODEBUILD_BUILD_NUMBER" "$ECR_REGISTRY_URI/$BACKEND_REPO:$CODEBUILD_BUILD_NUMBER" > imagedefinitions.json
-      - cat imagedefinitions.json
+      - echo "Generating imagedefinitions artifacts for ECS deploy..."
+      - rm -f imagedefinitions-frontend.json imagedefinitions-backend.json
+
+      # IMPORTANT: "name" MUST match the container name in the target task definition
+      - printf '[{"name":"frontend","imageUri":"%s"}]' "$ECR_REGISTRY_URI/$FRONTEND_REPO:$IMAGE_TAG" > imagedefinitions-frontend.json
+      - printf '[{"name":"backend","imageUri":"%s"}]' "$ECR_REGISTRY_URI/$BACKEND_REPO:$IMAGE_TAG" > imagedefinitions-backend.json
+
+      - echo "--- imagedefinitions-frontend.json ---"
+      - cat imagedefinitions-frontend.json
+      - echo "--- imagedefinitions-backend.json ---"
+      - cat imagedefinitions-backend.json
 
 artifacts:
   files:
-    - imagedefinitions.json
+    - imagedefinitions-frontend.json
+    - imagedefinitions-backend.json
   discard-paths: yes
