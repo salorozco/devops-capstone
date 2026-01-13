@@ -164,6 +164,26 @@ Resources:
                 - Name: BuildArtifact
               RunOrder: 2
 
+        - Name: ScaleUp
+          Actions:
+            - Name: ScaleServicesUp
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: devops-capstone-scale-up
+                EnvironmentVariables: !Sub >-
+                  [
+                    {"name":"AWS_REGION","value":"${AWS::Region}","type":"PLAINTEXT"},
+                    {"name":"ECS_CLUSTER","value":"${EcsClusterName}","type":"PLAINTEXT"},
+                    {"name":"BACKEND_SERVICE","value":"${BackendServiceName}","type":"PLAINTEXT"},
+                    {"name":"FRONTEND_SERVICE","value":"${FrontendServiceName}","type":"PLAINTEXT"}
+                  ]
+              InputArtifacts:
+                - Name: BuildArtifact
+              RunOrder: 1
 Outputs:
   PipelineName:
     Value: !Ref CapstonePipeline

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Capstone - ECR repos + CodeBuild project (pipeline-invoked). IAM roles come from infra/99-iam."
+Description: "Capstone - ECR repos + CodeBuild projects (pipeline-invoked). IAM roles come from infra/99-iam."
 
 Parameters:
   FrontendRepoName:
@@ -14,6 +14,10 @@ Parameters:
     Type: String
     Default: devops-capstone-build
 
+  ScaleUpProjectName:
+    Type: String
+    Default: devops-capstone-scale-up
+
   CodeBuildServiceRoleArn:
     Type: String
     Description: "IAM role ARN used by CodeBuild (created by infra/99-iam)"
@@ -22,6 +26,11 @@ Parameters:
     Type: String
     Default: buildspec.yml
     Description: "Path to buildspec in the repo"
+
+  ScaleUpBuildSpecPath:
+    Type: String
+    Default: infra/03-scale/buildspec-scale-up.yml
+    Description: "Path to scale-up buildspec in the repo"
 
 Resources:
   FrontendRepo:
@@ -57,16 +66,34 @@ Resources:
         CloudWatchLogs:
           Status: ENABLED
 
+  CapstoneScaleUpCodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ScaleUpProjectName
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      Artifacts:
+        Type: CODEPIPELINE
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Ref ScaleUpBuildSpecPath
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: false
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+
 Outputs:
   FrontendRepoUri:
     Value: !GetAtt FrontendRepo.RepositoryUri
-    Export:
-      Name: devops-capstone-frontend-repo-uri
 
   BackendRepoUri:
     Value: !GetAtt BackendRepo.RepositoryUri
-    Export:
-      Name: devops-capstone-backend-repo-uri
 
   CodeBuildProjectNameOut:
     Value: !Ref CapstoneCodeBuild
+
+  ScaleUpProjectNameOut:
+    Value: !Ref CapstoneScaleUpCodeBuild

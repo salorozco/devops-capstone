@@ -73,7 +73,6 @@ Resources:
                 Resource: "*"
 
               # ECS Deploy action needs to register/update task defs and services indirectly
-              # (The ECS action uses the pipeline role; this keeps it simple for the lab)
               - Effect: Allow
                 Action:
                   - ecs:DescribeServices
@@ -118,6 +117,13 @@ Resources:
                   - s3:ListBucket
                 Resource: "*"
 
+              # Allow scale-up/down if you later do it from CodeBuild
+              - Effect: Allow
+                Action:
+                  - ecs:UpdateService
+                  - ecs:DescribeServices
+                Resource: "*"
+
         - PolicyName: CodeBuildEcrPushPull
           PolicyDocument:
             Version: "2012-10-17"
@@ -145,8 +151,7 @@ Resources:
 
   #############################################
   # CloudFormation Execution Role
-  # This role is assumed by CloudFormation when your pipeline "Deploy (CloudFormation)" actions run.
-  # IMPORTANT: This is the one that needs ecr:CreateRepository, ecs, iam, etc.
+  # Assumed by CloudFormation when pipeline CloudFormation actions run.
   #############################################
   CloudFormationExecutionRole:
     Type: AWS::IAM::Role
@@ -177,6 +182,16 @@ Resources:
                   - ecr:PutLifecyclePolicy
                   - ecr:DeleteLifecyclePolicy
                 Resource: "*"
+
+              # CodeBuild (CloudFormation must be able to create the CodeBuild project resource)
+              - Sid: AllowCloudFormationToManageCodeBuild
+                Effect: Allow
+                Action:
+                  - codebuild:CreateProject
+                  - codebuild:UpdateProject
+                  - codebuild:DeleteProject
+                  - codebuild:BatchGetProjects
+                Resource: arn:aws:codebuild:us-east-1:343437023511:project/devops-capstone-build
 
               # ECS + Fargate basics
               - Effect: Allow
@@ -264,7 +279,6 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        # This AWS-managed policy is the standard for ECS task execution:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
 Outputs:

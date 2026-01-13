@@ -1,0 +1,7 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo "Scaling services up..."
+      - bash infra/03-scale/scale-up.sh

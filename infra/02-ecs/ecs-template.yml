@@ -83,7 +83,7 @@ Resources:
       ServiceName: !Ref BackendServiceName
       Cluster: !Ref Cluster
       LaunchType: FARGATE
-      DesiredCount: 1
+      DesiredCount: 0
       TaskDefinition: !Ref BackendTaskDef
       NetworkConfiguration:
         AwsvpcConfiguration:
@@ -97,7 +97,7 @@ Resources:
       ServiceName: !Ref FrontendServiceName
       Cluster: !Ref Cluster
       LaunchType: FARGATE
-      DesiredCount: 1
+      DesiredCount: 0
       TaskDefinition: !Ref FrontendTaskDef
       NetworkConfiguration:
         AwsvpcConfiguration:
