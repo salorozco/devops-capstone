@@ -88,9 +88,11 @@ Resources:
 Outputs:
   FrontendRepoUri:
     Value: !GetAtt FrontendRepo.RepositoryUri
+    Export: { Name: devops-capstone-frontend-repo-uri }
 
   BackendRepoUri:
     Value: !GetAtt BackendRepo.RepositoryUri
+    Export: { Name: devops-capstone-backend-repo-uri }
 
   CodeBuildProjectNameOut:
     Value: !Ref CapstoneCodeBuild
