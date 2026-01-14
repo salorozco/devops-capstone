@@ -1,5 +1,5 @@
 # ---- build stage ----
-FROM node:20-alpine AS build
+FROM public.ecr.aws/docker/library/node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime stage (nginx) ----
-FROM nginx:1.27-alpine
+FROM public.ecr.aws/docker/library/nginx:1.27-alpine
 
 # Vite SPA routing support (optional but recommended)
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf
