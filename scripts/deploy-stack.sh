@@ -22,6 +22,11 @@ BACKEND_SERVICE_NAME="backend-service"
 SUBNET_IDS="subnet-0a9b44affc4c6b24b,subnet-0ef030642df2209ef"
 SECURITY_GROUP_IDS="sg-047652fe66d8e0b1f"
 
+VPC_ID="vpc-0ffcc08b2aecd2d07"
+ALB_SUBNET_IDS="$SUBNET_IDS"
+ALB_SECURITY_GROUP_ID="$SECURITY_GROUP_IDS"
+
+
 # --- sanity checks ---
 [[ -f "$IAM_TEMPLATE" ]] || { echo "Missing $IAM_TEMPLATE"; exit 1; }
 [[ -f "$PIPELINE_TEMPLATE" ]] || { echo "Missing $PIPELINE_TEMPLATE"; exit 1; }
@@ -74,7 +79,10 @@ aws cloudformation deploy \
       FrontendServiceName="$FRONTEND_SERVICE_NAME" \
       BackendServiceName="$BACKEND_SERVICE_NAME" \
       SubnetIds="$SUBNET_IDS" \
-      SecurityGroupIds="$SECURITY_GROUP_IDS"
+      SecurityGroupIds="$SECURITY_GROUP_IDS" \
+      VpcId="$VPC_ID" \
+      AlbSubnetIds="$ALB_SUBNET_IDS" \
+      AlbSecurityGroupId="$ALB_SECURITY_GROUP_ID"
 
 echo "Done. Pipeline stack outputs:"
 aws cloudformation describe-stacks \

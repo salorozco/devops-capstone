@@ -41,6 +41,18 @@ Parameters:
     Type: String
     Description: "Comma-delimited security group IDs (sg-xxx)"
 
+  VpcId:
+    Type: String
+    Description: "VPC ID for ALB + target groups (vpc-xxxx)"
+
+  AlbSubnetIds:
+    Type: String
+    Description: "Comma-delimited PUBLIC subnet IDs for the ALB (subnet-a,subnet-b)"
+
+  AlbSecurityGroupId:
+    Type: String
+    Description: "Security group ID for the ALB (sg-xxxx)"  
+
 Resources:
   CapstonePipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -112,7 +124,10 @@ Resources:
                     "FrontendServiceName": "${FrontendServiceName}",
                     "BackendServiceName": "${BackendServiceName}",
                     "SubnetIds": "${SubnetIds}",
-                    "SecurityGroupIds": "${SecurityGroupIds}"
+                    "SecurityGroupIds": "${SecurityGroupIds}",
+                    "VpcId": "${VpcId}",
+                    "AlbSubnetIds": "${AlbSubnetIds}",
+                    "AlbSecurityGroupId": "${AlbSecurityGroupId}"
                   }
               InputArtifacts:
                 - Name: SourceArtifact

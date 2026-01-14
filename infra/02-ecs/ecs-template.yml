@@ -22,11 +22,83 @@ Parameters:
     Type: String
     Description: "Comma-delimited SG IDs (sg-xxx)"
 
+  VpcId:
+    Type: String
+    Description: "VPC ID where ALB and target groups live (vpc-xxxx)"
+
+  AlbSubnetIds:
+    Type: String
+    Description: "Comma-delimited PUBLIC subnet IDs for ALB (subnet-a,subnet-b)"
+
+  AlbSecurityGroupId:
+    Type: String
+    Description: "Security group ID for the ALB (sg-xxxx)"
+  
+
 Resources:
   Cluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Ref EcsClusterName
+      ClusterName: !Ref EcsClusterName    
+
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: alb-capstone
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Split [",", !Ref AlbSubnetIds]
+      SecurityGroups:
+        - !Ref AlbSecurityGroupId
+
+  FrontendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: devops-capstone-frontend-tg
+      TargetType: ip
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: "200-399"
+
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: devops-capstone-backend-tg
+      TargetType: ip
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 3000
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /task
+      Matcher:
+        HttpCode: "200-399"
+
+  AlbHttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendTargetGroup
+
+  BackendPathRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref AlbHttpListener
+      Priority: 1
+      Conditions:
+        - Field: path-pattern
+          Values: ["/task*"]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
+    
 
   TaskExecutionRole:
     Type: AWS::IAM::Role
@@ -79,6 +151,9 @@ Resources:
 
   BackendService:
     Type: AWS::ECS::Service
+    DependsOn:
+      - AlbHttpListener
+      - BackendPathRule
     Properties:
       ServiceName: !Ref BackendServiceName
       Cluster: !Ref Cluster
@@ -90,9 +165,16 @@ Resources:
           AssignPublicIp: ENABLED
           Subnets: !Split [",", !Ref SubnetIds]
           SecurityGroups: !Split [",", !Ref SecurityGroupIds]
+      LoadBalancers:
+        - TargetGroupArn: !Ref BackendTargetGroup
+          ContainerName: backend
+          ContainerPort: 3000
+
 
   FrontendService:
     Type: AWS::ECS::Service
+    DependsOn:
+      - AlbHttpListener
     Properties:
       ServiceName: !Ref FrontendServiceName
       Cluster: !Ref Cluster
@@ -104,6 +186,11 @@ Resources:
           AssignPublicIp: ENABLED
           Subnets: !Split [",", !Ref SubnetIds]
           SecurityGroups: !Split [",", !Ref SecurityGroupIds]
+      LoadBalancers:
+        - TargetGroupArn: !Ref FrontendTargetGroup
+          ContainerName: frontend
+          ContainerPort: 80
+
 
 Outputs:
   ClusterName:
@@ -112,3 +199,5 @@ Outputs:
     Value: !Ref BackendService
   FrontendServiceNameOut:
     Value: !Ref FrontendService
+  AlbDnsName:
+    Value: !GetAtt Alb.DNSName  
