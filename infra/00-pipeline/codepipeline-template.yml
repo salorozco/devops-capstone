@@ -182,7 +182,7 @@ Resources:
                     {"name":"FRONTEND_SERVICE","value":"${FrontendServiceName}","type":"PLAINTEXT"}
                   ]
               InputArtifacts:
-                - Name: BuildArtifact
+                - Name: SourceArtifact
               RunOrder: 1
 Outputs:
   PipelineName:
