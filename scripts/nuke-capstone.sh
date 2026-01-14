@@ -3,6 +3,8 @@ set -euo pipefail
 
 REGION="${1:-us-east-1}"
 
+export AWS_REGION="$REGION"
+
 PIPELINE_STACK="${2:-devops-capstone-cicd-stack}"
 CODEBUILD_STACK="${3:-devops-capstone-codebuild-stack}"
 ECS_STACK="${4:-devops-capstone-ecs-stack}"
@@ -10,6 +12,15 @@ IAM_STACK="${5:-devops-capstone-iam}"
 
 # WARNING: only empty this if it's a dedicated lab bucket
 PIPELINE_BUCKET="${6:-sal-codebuild23}"
+
+echo "== Preview: stacks to delete =="
+aws cloudformation list-stacks \
+  --region "$REGION" \
+  --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE ROLLBACK_COMPLETE \
+  --query "StackSummaries[?StackName=='$PIPELINE_STACK' || StackName=='$ECS_STACK' || StackName=='$CODEBUILD_STACK' || StackName=='$IAM_STACK'].[StackName,StackStatus]" \
+  --output table || true
+echo
+
 
 echo "Region: $REGION"
 echo "IAM stack: $IAM_STACK"

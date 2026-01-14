@@ -191,7 +191,7 @@ Resources:
                   - codebuild:UpdateProject
                   - codebuild:DeleteProject
                   - codebuild:BatchGetProjects
-                Resource: arn:aws:codebuild:us-east-1:343437023511:project/devops-capstone-build
+                Resource: "*"
 
               # ECS + Fargate basics
               - Effect: Allow

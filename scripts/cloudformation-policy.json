@@ -1,0 +1,16 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowCloudFormationToManageCodeBuild",
+            "Effect": "Allow",
+            "Action": [
+                "codebuild:CreateProject",
+                "codebuild:UpdateProject",
+                "codebuild:DeleteProject",
+                "codebuild:BatchGetProjects"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
