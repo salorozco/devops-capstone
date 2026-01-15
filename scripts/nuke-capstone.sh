@@ -40,6 +40,35 @@ aws cloudformation delete-stack --stack-name "$ECS_STACK" --region "$REGION" || 
 aws cloudformation wait stack-delete-complete --stack-name "$ECS_STACK" --region "$REGION" || true
 echo
 
+echo "== Deregister ECS task definitions (cleanup old revisions) =="
+
+# You can add/remove families here if you rename them
+TASK_FAMILIES=(
+  "devops-capstone-frontend-task"
+  "devops-capstone-backend-task"
+)
+
+for FAMILY in "${TASK_FAMILIES[@]}"; do
+  echo "Finding task definitions for family: $FAMILY"
+
+  ARNS=$(aws ecs list-task-definitions \
+    --region "$REGION" \
+    --family-prefix "$FAMILY" \
+    --status ACTIVE \
+    --query "taskDefinitionArns[]" \
+    --output text || true)
+
+  if [[ -z "${ARNS:-}" ]]; then
+    echo "No ACTIVE task definitions found for $FAMILY (ok)"
+    continue
+  fi
+
+  for ARN in $ARNS; do
+    echo "Deregistering: $ARN"
+    aws ecs deregister-task-definition --region "$REGION" --task-definition "$ARN" >/dev/null || true
+  done
+done
+echo
 
 echo "== Clean ECR images (so repo deletion won't fail) =="
 for REPO in devops-capstone-frontend devops-capstone-backend; do
