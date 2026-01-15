@@ -257,8 +257,19 @@ Resources:
                   - elasticloadbalancing:DeleteTargetGroup
                   - elasticloadbalancing:CreateListener
                   - elasticloadbalancing:DeleteListener
+
+                  # ✅ missing for ListenerRule resource
+                  - elasticloadbalancing:CreateRule
+                  - elasticloadbalancing:DeleteRule
+                  - elasticloadbalancing:DescribeRules
+
+                  # commonly needed when updating listener default actions / attrs
+                  - elasticloadbalancing:ModifyListener
+                  - elasticloadbalancing:ModifyRule
+                  - elasticloadbalancing:SetSecurityGroups
+                  - elasticloadbalancing:SetSubnets
+
                   - elasticloadbalancing:Describe*
-                  - elasticloadbalancing:Modify*
                   - elasticloadbalancing:RegisterTargets
                   - elasticloadbalancing:DeregisterTargets
                 Resource: "*"
