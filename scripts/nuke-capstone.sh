@@ -40,10 +40,6 @@ aws cloudformation delete-stack --stack-name "$ECS_STACK" --region "$REGION" || 
 aws cloudformation wait stack-delete-complete --stack-name "$ECS_STACK" --region "$REGION" || true
 echo
 
-echo "== Delete CodeBuild stack =="
-aws cloudformation delete-stack --stack-name "$CODEBUILD_STACK" --region "$REGION" || true
-aws cloudformation wait stack-delete-complete --stack-name "$CODEBUILD_STACK" --region "$REGION" || true
-echo
 
 echo "== Clean ECR images (so repo deletion won't fail) =="
 for REPO in devops-capstone-frontend devops-capstone-backend; do
@@ -60,6 +56,11 @@ for REPO in devops-capstone-frontend devops-capstone-backend; do
     echo "Repo not found (ok): $REPO"
   fi
 done
+echo
+
+echo "== Delete CodeBuild stack =="
+aws cloudformation delete-stack --stack-name "$CODEBUILD_STACK" --region "$REGION" || true
+aws cloudformation wait stack-delete-complete --stack-name "$CODEBUILD_STACK" --region "$REGION" || true
 echo
 
 echo "== Empty pipeline artifact bucket (only if dedicated) =="
